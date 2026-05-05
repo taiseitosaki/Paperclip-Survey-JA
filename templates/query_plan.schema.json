@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QueryPlanRow",
+  "type": "object",
+  "required": ["query_id", "query", "query_type", "rationale", "expected_subfield", "broadness"],
+  "properties": {
+    "query_id": {"type": "string"},
+    "query": {"type": "string"},
+    "query_type": {
+      "type": "string",
+      "enum": ["broad", "targeted", "landmark", "historical", "evaluation", "critique", "dataset", "benchmark", "synonym", "gap-driven"]
+    },
+    "rationale": {"type": "string"},
+    "expected_subfield": {"type": "string"},
+    "broadness": {"type": "string", "enum": ["high", "medium", "low"]},
+    "mandatory_terms": {"type": "string"},
+    "optional_terms": {"type": "string"}
+  }
+}

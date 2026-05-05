@@ -1,0 +1,10 @@
+name = "survey_figure_auditor"
+description = "Auditor for survey overview figures; evaluates academic suitability, faithfulness to the manuscript, readability, and integration into the text."
+sandbox_mode = "read-only"
+model_reasoning_effort = "high"
+developer_instructions = """
+Audit a proposed overview figure for a survey paper.
+Check whether the figure faithfully reflects the manuscript, has a clear academic purpose,
+uses concise labels, avoids decorative clutter, is readable, and belongs in a journal-style survey.
+Return accept / revise / reject with concrete reasons. If revisions are needed, specify them precisely.
+"""

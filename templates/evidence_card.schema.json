@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SurveyEvidenceCard",
+  "type": "object",
+  "required": [
+    "card_id",
+    "title",
+    "authors",
+    "year",
+    "source_type",
+    "publication_status",
+    "candidate_tier",
+    "topical_role",
+    "contribution",
+    "technical_details",
+    "novelty_or_importance",
+    "limitations",
+    "supported_claims",
+    "evidence_scope",
+    "confidence"
+  ],
+  "properties": {
+    "card_id": {"type": "string", "pattern": "^C\\d{3,4}$"},
+    "paper_id": {"type": "string"},
+    "bib_key": {"type": "string"},
+    "title": {"type": "string"},
+    "authors": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "array", "items": {"type": "string"}}
+      ]
+    },
+    "year": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+    "source": {"type": "string"},
+    "source_type": {
+      "type": "string",
+      "description": "primary, review, benchmark, methods, preprint, conference, journal, book, report, etc."
+    },
+    "publication_status": {
+      "type": "string",
+      "description": "published, accepted conference, preprint only, preprint with later journal version, unknown, etc."
+    },
+    "venue": {"type": "string"},
+    "journal": {"type": "string"},
+    "doi": {"type": "string"},
+    "pmid": {"type": "string"},
+    "pmcid": {"type": "string"},
+    "arxiv_id": {"type": "string"},
+    "url": {"type": "string"},
+    "paperclip_paths": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "paperclip_handles": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "evidence_scope": {
+      "type": "string",
+      "enum": ["full-text", "sections", "abstract-only", "metadata-only", "figure-derived", "external-bibliographic", "mixed"]
+    },
+    "candidate_tier": {
+      "type": "string",
+      "enum": ["core", "adjacent", "context", "out_of_scope"]
+    },
+    "topical_role": {"type": "string"},
+    "contribution": {"type": "string"},
+    "technical_details": {
+      "type": "object",
+      "properties": {
+        "method_or_architecture": {"type": "string"},
+        "data_or_corpus": {"type": "string"},
+        "task_or_problem": {"type": "string"},
+        "training_objective": {"type": "string"},
+        "evaluation_protocol": {"type": "string"},
+        "quantitative_results": {"type": "string"},
+        "implementation_details": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "novelty_or_importance": {"type": "string"},
+    "limitations": {"type": "string"},
+    "relationship_to_other_papers": {"type": "string"},
+    "supported_claims": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "topic_tags": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "read_status": {
+      "type": "string",
+      "enum": ["deep-read", "partial-read", "map-only", "metadata-only", "failed"]
+    },
+    "exclusion_reason_if_any": {"type": "string"},
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": true
+}

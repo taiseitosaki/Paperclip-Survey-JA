@@ -1,0 +1,5 @@
+# No required third-party Python packages for local helper scripts.
+# Paperclip CLI should be installed separately:
+#   curl -fsSL https://paperclip.gxl.ai/install.sh | bash
+#   paperclip login
+#   paperclip install
