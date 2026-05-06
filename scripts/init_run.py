@@ -95,7 +95,15 @@ def write_placeholders(run_dir: Path, topic: str, manifest: dict) -> None:
         encoding="utf-8",
     )
     (run_dir / "figures" / "overview_figure_prompt.md").write_text(
-        "# Overview figure prompt\n\nDescribe the intended figure purpose, content, and generation prompt here.\n",
+        "# Overview figure prompt\n\nRendering route: pending\n\nDescribe the intended figure purpose, content, and Codex image_gen prompt here. Use deterministic rendering only if image_gen cannot be invoked, and record the fallback reason.\n",
+        encoding="utf-8",
+    )
+    (run_dir / "figures" / "overview_figure_spec.md").write_text(
+        "# Overview figure spec\n\nDistill the manuscript into a figure claim, layout archetype, node list, edge list, and omission list before drawing.\n",
+        encoding="utf-8",
+    )
+    (run_dir / "reports" / "figure_selection.md").write_text(
+        "# Figure selection\n\nStatus: pending\n\nRendering route: pending\n\nGenerate at least two candidates with Codex image_gen first, compare them, and record why the final figure was selected. If deterministic rendering was used, record why image_gen could not be invoked.\n",
         encoding="utf-8",
     )
 
@@ -148,10 +156,14 @@ def main() -> None:
             "drafts/survey_en.linked.md",
             "drafts/survey_ja.linked.md",
             "figures/overview_figure_prompt.md",
+            "figures/overview_figure_spec.md",
             "figures/overview_figure.<ext>",
+            "reports/figure_selection.md",
             "tex/survey_en.tex",
             "tex/survey_ja.tex",
             "tex/references.bib",
+            "tex/survey_en.pdf (if local LaTeX environment is available)",
+            "tex/survey_ja.pdf (if local LuaLaTeX or upLaTeX+dvipdfmx environment is available)",
             "reports/figure_audit.md",
             "reports/claim_audit.md",
             "reports/validation_report.md",

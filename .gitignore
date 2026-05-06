@@ -26,7 +26,45 @@ share/python-wheels/
 *.egg
 MANIFEST
 .DS_Store
+
+# Survey generated artifacts.
 outputs/
+tmp_outputs/
+.tmp_outputs/
+local_outputs/
+artifacts/
+
+# Local release / exchange artifacts.
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.patch
+*.diff
+
+# LaTeX build artifacts, including local Overleaf-style builds.
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.nav
+*.log
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
+_minted-*/
+
+# Generated survey figures outside outputs/ should be reviewed before tracking.
+figures/overview_figure*
+
 
 # PyInstaller
 #   Usually these files are written by a python script from a template

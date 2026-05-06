@@ -3,3 +3,6 @@
 #   curl -fsSL https://paperclip.gxl.ai/install.sh | bash
 #   paperclip login
 #   paperclip install
+
+# Required only for fallback deterministic overview-figure rendering via scripts/render_overview_figure.py
+Pillow>=10.0.0

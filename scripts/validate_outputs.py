@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -17,6 +18,8 @@ FIG_MD_RE = re.compile(r"!\[[^\]]*\]\(([^)]*overview_figure[^)]*)\)", re.I)
 FIG_TEX_RE = re.compile(r"\\includegraphics\[[^\]]*\]\{([^}]*overview_figure[^}]*)\}", re.I)
 FIG_REF_EN_RE = re.compile(r"\bFigure\s*1\b")
 FIG_REF_JA_RE = re.compile(r"図\s*1")
+IMAGE_GEN_ROUTE_RE = re.compile(r"(?im)^\s*(?:rendering\s+route|route|source)\s*:\s*image_gen\b")
+FALLBACK_ROUTE_RE = re.compile(r"(?im)^\s*(?:rendering\s+route|route|source)\s*:\s*(?:fallback|deterministic|render_overview_figure)\b")
 
 
 def load_cards(run_dir: Path) -> Dict[str, dict]:
@@ -82,6 +85,77 @@ def find_overview_figure(run_dir: Path) -> Optional[Path]:
     return None
 
 
+def find_figure_candidates(run_dir: Path) -> List[Path]:
+    fig_dir = run_dir / "figures"
+    if not fig_dir.exists():
+        return []
+    candidates: List[Path] = []
+    for pattern in [
+        "overview_figure_candidate_*.png",
+        "overview_figure_candidate_*.jpg",
+        "overview_figure_candidate_*.jpeg",
+        "overview_figure_candidate_*.webp",
+        "overview_figure_candidate_*.svg",
+    ]:
+        candidates.extend(fig_dir.glob(pattern))
+    return sorted(set(candidates))
+
+
+def find_deterministic_figure_artifacts(run_dir: Path) -> List[Path]:
+    fig_dir = run_dir / "figures"
+    if not fig_dir.exists():
+        return []
+    artifacts: List[Path] = []
+    json_spec = fig_dir / "overview_figure_spec.json"
+    if json_spec.exists():
+        artifacts.append(json_spec)
+    artifacts.extend(fig_dir.glob("overview_figure_candidate_*.svg"))
+    return sorted(set(artifacts))
+
+
+def latex_environment_available() -> bool:
+    return any(shutil.which(cmd) for cmd in ["latexmk", "lualatex", "xelatex", "pdflatex", "uplatex"])
+
+
+def english_pdf_environment_available() -> bool:
+    return any(shutil.which(cmd) for cmd in ["pdflatex", "xelatex", "lualatex"])
+
+
+def japanese_pdf_environment_available() -> bool:
+    return bool(shutil.which("lualatex") or (shutil.which("uplatex") and shutil.which("dvipdfmx")))
+
+
+def figure_rendering_route(*texts: str) -> str:
+    combined = "\n".join(texts)
+    if IMAGE_GEN_ROUTE_RE.search(combined):
+        return "image_gen"
+    if FALLBACK_ROUTE_RE.search(combined):
+        return "fallback"
+    return "unrecorded"
+
+
+def figure_audit_decision(text: str) -> str:
+    if not text.strip():
+        return "missing"
+    m = re.search(r"(?im)^\s*(decision|status)\s*:\s*(accept|accepted|revise|revision|reject|rejected)\b", text)
+    if m:
+        value = m.group(2).lower()
+        if value.startswith("accept"):
+            return "accept"
+        if value.startswith("revis"):
+            return "revise"
+        if value.startswith("reject"):
+            return "reject"
+    lower = text.lower()
+    if re.search(r"\breject(ed)?\b", lower):
+        return "reject"
+    if re.search(r"\brevis(e|ion|ed)\b", lower):
+        return "revise"
+    if re.search(r"\baccept(ed)?\b", lower):
+        return "accept"
+    return "unknown"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
@@ -96,6 +170,8 @@ def main() -> None:
         "drafts/survey_en.linked.md",
         "drafts/survey_ja.linked.md",
         "figures/overview_figure_prompt.md",
+        "figures/overview_figure_spec.md",
+        "reports/figure_selection.md",
         "tex/survey_en.tex",
         "tex/survey_ja.tex",
         "tex/references.bib",
@@ -118,8 +194,13 @@ def main() -> None:
     tex_en = read_text(run_dir / "tex" / "survey_en.tex")
     tex_ja = read_text(run_dir / "tex" / "survey_ja.tex")
     bib = read_text(run_dir / "tex" / "references.bib")
+    pdf_en = run_dir / "tex" / "survey_en.pdf"
+    pdf_ja = run_dir / "tex" / "survey_ja.pdf"
     web_summary = read_text(run_dir / "web" / "integrated_search_summary.md")
     figure_audit = read_text(run_dir / "reports" / "figure_audit.md")
+    figure_spec = read_text(run_dir / "figures" / "overview_figure_spec.md")
+    figure_prompt = read_text(run_dir / "figures" / "overview_figure_prompt.md")
+    figure_selection = read_text(run_dir / "reports" / "figure_selection.md")
 
     cited_en = set(CID_RE.findall(en))
     cited_ja = set(CID_RE.findall(ja))
@@ -134,6 +215,13 @@ def main() -> None:
     citation_count = len(cited_all)
     web_candidate_count = csv_count(run_dir / "web" / "triangulated_candidates.csv")
     figure_path = find_overview_figure(run_dir)
+    figure_candidates = find_figure_candidates(run_dir)
+    deterministic_artifacts = find_deterministic_figure_artifacts(run_dir)
+    audit_decision = figure_audit_decision(figure_audit)
+    rendering_route = figure_rendering_route(figure_prompt, figure_selection)
+    latex_available = latex_environment_available()
+    en_pdf_available = english_pdf_environment_available()
+    ja_pdf_available = japanese_pdf_environment_available()
 
     warnings: List[str] = []
     errors: List[str] = []
@@ -144,6 +232,26 @@ def main() -> None:
 
     if not figure_path:
         errors.append("Missing overview figure under `figures/overview_figure.<ext>`")
+
+    if len(figure_candidates) < 2:
+        warnings.append(f"Only {len(figure_candidates)} overview-figure candidate(s) found. Generate at least two candidates before final selection.")
+
+    if not figure_spec.strip() or len([ln for ln in figure_spec.splitlines() if ln.strip()]) < 8:
+        warnings.append("overview_figure_spec.md looks empty or too brief; figure content may not have been distilled before rendering.")
+
+    if not figure_selection.strip() or "pending" in figure_selection.lower():
+        warnings.append("figure_selection.md is missing, pending, or too brief; document why the accepted figure was selected.")
+
+    if rendering_route == "unrecorded":
+        warnings.append("Overview figure rendering route is not recorded. Add `Rendering route: image_gen` or a documented fallback route to overview_figure_prompt.md or figure_selection.md.")
+    elif rendering_route == "image_gen" and deterministic_artifacts:
+        warnings.append(
+            "Figure route is recorded as image_gen, but deterministic fallback artifacts are present: "
+            + ", ".join(str(p.relative_to(run_dir)) for p in deterministic_artifacts[:6])
+        )
+
+    if audit_decision != "accept":
+        errors.append(f"Figure audit decision is `{audit_decision}`, not `accept`.")
 
     if invalid_cards:
         errors.append(f"Invalid evidence card IDs or JSON lines: {', '.join(invalid_cards[:10])}")
@@ -163,6 +271,18 @@ def main() -> None:
     missing_bib = sorted(cited_all - bib_ids)
     if missing_bib:
         warnings.append(f"Citations missing from references.bib: {', '.join(missing_bib)}")
+
+    if latex_available:
+        if tex_en and en_pdf_available and not pdf_en.exists():
+            errors.append("Local LaTeX tools are available, but `tex/survey_en.pdf` was not built. Run `python3 scripts/compile_latex.py --run <run-dir>`.")
+        elif tex_en and not en_pdf_available:
+            warnings.append("Local LaTeX tools are present, but no supported English PDF engine (pdfLaTeX, XeLaTeX, or LuaLaTeX) is available.")
+        if tex_ja and ja_pdf_available and not pdf_ja.exists():
+            errors.append("Local Japanese LaTeX tools are available, but `tex/survey_ja.pdf` was not built. Run `python3 scripts/compile_latex.py --run <run-dir>`.")
+        elif tex_ja and not ja_pdf_available:
+            warnings.append("Local LaTeX tools are present, but neither LuaLaTeX nor upLaTeX+dvipdfmx is available for Japanese PDF compilation.")
+    else:
+        warnings.append("No local LaTeX environment detected; PDF compilation was skipped.")
 
     if ja and len(CJK_RE.findall(ja)) < max(50, len(ja) // 20):
         warnings.append("Japanese survey appears to contain too little Japanese text; check for untranslated English sections.")
@@ -191,20 +311,19 @@ def main() -> None:
 
     if figure_path:
         if not FIG_MD_RE.search(en) and not FIG_MD_RE.search(en_linked):
-            warnings.append("English Markdown draft does not appear to contain an overview-figure image block.")
+            errors.append("English Markdown draft does not contain the accepted overview-figure image block.")
         if not FIG_MD_RE.search(ja) and not FIG_MD_RE.search(ja_linked):
-            warnings.append("Japanese Markdown draft does not appear to contain an overview-figure image block.")
+            errors.append("Japanese Markdown draft does not contain the accepted overview-figure image block.")
         if not FIG_TEX_RE.search(tex_en):
-            warnings.append("English TeX does not appear to include the overview figure.")
+            errors.append("English TeX does not include the accepted overview figure.")
         if not FIG_TEX_RE.search(tex_ja):
-            warnings.append("Japanese TeX does not appear to include the overview figure.")
+            errors.append("Japanese TeX does not include the accepted overview figure.")
         if not FIG_REF_EN_RE.search(en):
             warnings.append("English draft may not explicitly reference Figure 1 in the prose.")
         if not FIG_REF_JA_RE.search(ja):
             warnings.append("Japanese draft may not explicitly reference 図1 in the prose.")
 
-    audit_lower = figure_audit.lower()
-    if "accept" not in audit_lower and "accepted" not in audit_lower:
+    if audit_decision != "accept":
         warnings.append("Figure audit does not clearly indicate acceptance.")
 
     report = []
@@ -222,7 +341,13 @@ def main() -> None:
     report.append(f"- Linked citation IDs: {len(linked_ids)}")
     report.append(f"- Reference anchors: {len(anchors)}")
     report.append(f"- BibTeX entries: {len(bib_ids)}")
+    report.append(f"- Local LaTeX environment available: {'yes' if latex_available else 'no'}")
+    report.append(f"- English PDF present: {'yes' if pdf_en.exists() else 'no'}")
+    report.append(f"- Japanese PDF present: {'yes' if pdf_ja.exists() else 'no'}")
     report.append(f"- Overview figure present: {'yes' if figure_path else 'no'}")
+    report.append(f"- Overview figure candidates: {len(figure_candidates)}")
+    report.append(f"- Figure rendering route: {rendering_route}")
+    report.append(f"- Figure audit decision: {audit_decision}")
     report.append("")
     report.append("## Errors")
     report.append("")

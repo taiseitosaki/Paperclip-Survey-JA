@@ -49,14 +49,20 @@ drafts/survey_ja.md
 drafts/survey_en.linked.md
 drafts/survey_ja.linked.md
 figures/overview_figure_prompt.md
+figures/overview_figure_spec.md
+figures/overview_figure_candidate_a.<png|jpg|jpeg|webp|svg>
+figures/overview_figure_candidate_b.<png|jpg|jpeg|webp|svg>
 figures/overview_figure.<png|jpg|jpeg|webp>
 tex/survey_en.tex
 tex/survey_ja.tex
 tex/references.bib
+tex/survey_en.pdf  # if local LaTeX is available
+tex/survey_ja.pdf  # if local LuaLaTeX or upLaTeX+dvipdfmx is available
 reports/protocol.md
 reports/methods.md
 reports/claim_audit.md
 reports/figure_audit.md
+reports/figure_selection.md
 reports/limitations.md
 reports/validation_report.md
 logs/paperclip_commands.md
@@ -77,8 +83,8 @@ logs/codex_worklog.md
 10. Draft the English survey using the `academic-writing` skill.
 11. Audit coverage and citation support.
 12. Translate the English survey into Japanese and then polish it with the `academic-ja-polish` skill.
-13. Create an overview figure using the `overview-figure` skill and audit it with `survey_figure_auditor`.
-14. Insert the accepted figure into the survey drafts, generate linked Markdown, TeX, BibTeX, and validation report.
+13. Create a figure spec, generate at least two overview-figure candidates using the `overview-figure` skill, and audit them with `survey_figure_auditor`.
+14. Select the accepted figure, record the selection rationale, insert it into the survey drafts, generate linked Markdown, TeX, BibTeX, and validation report.
 
 ## Step 1: Topic decomposition
 
@@ -284,7 +290,7 @@ Rules:
 
 After the English manuscript is substantively complete, create an overview figure.
 
-Use the `overview-figure` skill and save the generation brief to `figures/overview_figure_prompt.md`.
+Use the `overview-figure` skill. First save the generation brief to `figures/overview_figure_prompt.md`, then save a distilled layout/content spec to `figures/overview_figure_spec.md`.
 
 Requirements:
 
@@ -292,10 +298,17 @@ Requirements:
 - The figure must be academically useful, not decorative.
 - It should summarize the field structure or survey logic in a way that helps readers orient themselves.
 - Suitable content includes taxonomy, timeline, methodological axes, data-task-architecture map, or a survey workflow.
+- Do not simply convert each major manuscript section into one dense bullet box.
+- Prefer a figure with one dominant organizing panel and smaller contextual/constraint panels.
+- After the figure spec is explicit, use Codex `image_gen` first to create the overview-figure candidates.
+- If `image_gen` succeeds, save the accepted image as `figures/overview_figure.<png|jpg|jpeg|webp>`, record `Rendering route: image_gen`, and do not run code-based figure creation.
+- Use vector/slide construction or `scripts/render_overview_figure.py` only if `image_gen` is unavailable or cannot be invoked in the current environment, and record the fallback reason.
+- Generate at least two candidate figures.
+- Save the final choice and reasons for rejecting non-selected candidates to `reports/figure_selection.md`.
 
 Then ask `survey_figure_auditor` to evaluate the figure. Save the audit as `reports/figure_audit.md`.
 
-If the audit result is `revise`, improve the figure and audit again. If the result is `reject`, redesign it.
+If the audit result is `revise`, improve the figure and audit again. If the result is `reject`, redesign the spec rather than merely tweaking colors.
 
 After acceptance, insert the figure into `drafts/survey_en.md` and `drafts/survey_ja.md`, and make sure the main text explicitly mentions and explains the figure.
 
@@ -306,13 +319,17 @@ After the figure is integrated, run:
 ```bash
 python3 scripts/link_markdown_refs.py --run <RUN_DIR>
 python3 scripts/render_tex_bib.py --run <RUN_DIR>
+python3 scripts/compile_latex.py --run <RUN_DIR>
 python3 scripts/validate_outputs.py --run <RUN_DIR>
 ```
+
+If local LaTeX tools are available, `scripts/compile_latex.py` must build `tex/survey_en.pdf` and, when LuaLaTeX or upLaTeX+dvipdfmx is available, `tex/survey_ja.pdf`. The Japanese PDF must visibly render Japanese text; use explicit Japanese font embedding such as HaranoAji rather than treating a successful compiler exit as sufficient. If the tools are unavailable, report that PDF compilation was skipped rather than inventing PDFs.
 
 The final answer should report:
 
 - run directory;
 - key output files;
+- PDF files, or the reason PDF compilation was skipped;
 - candidate count / evidence-card count / citation count;
 - whether the figure was accepted;
 - remaining coverage or validation risks.

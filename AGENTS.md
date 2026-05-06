@@ -123,10 +123,18 @@ Requirements:
 - The figure should be in English, even if the Japanese manuscript is also produced.
 - It should communicate the field clearly in academic style. Typical contents include taxonomy, timeline, methodological landscape, data/task axes, or a survey workflow map, depending on what best fits the draft.
 - The figure must be created from the survey content, not as generic decoration.
-- Use the `overview-figure` skill and an image-generation tool if available.
+- Before any drawing step, create `figures/overview_figure_spec.md`.
+- The spec must distill the manuscript into a single figure claim, a layout archetype, a dominant panel, secondary panels, a node list, and an edge list.
+- After the figure content has been distilled and the layout is explicit, use Codex `image_gen` as the preferred rendering route for the candidate figures. Prompt it as a journal-style vector schematic, not a consumer infographic. If `image_gen` succeeds, save the accepted generated image as `figures/overview_figure.<png|jpg|jpeg|webp>`, record `Rendering route: image_gen`, insert that image into Markdown, and do not run code-based figure creation. Fall back to SVG/PPTX or `scripts/render_overview_figure.py` only when `image_gen` is unavailable or cannot be invoked in the current environment, and record that fallback reason in `logs/codex_worklog.md` or `reports/figure_selection.md`.
+- Generate at least two candidate layouts before final selection.
+- Hard constraints: <= 8 major nodes, <= 12 arrows, <= 3 example items per node, <= 35 words per node, no full paper-title walls, and no long arrow labels.
+- Avoid the equal-size “box farm” failure mode in which each survey section becomes a dense bullet rectangle with little visual hierarchy.
 - Store the prompt brief in `figures/overview_figure_prompt.md`.
+- Store the content spec in `figures/overview_figure_spec.md`.
+- Store candidate figures under `figures/overview_figure_candidate_*.<ext>`.
 - Store the accepted figure under `figures/overview_figure.<ext>`.
 - The figure must be audited by `survey_figure_auditor`. The audit goes to `reports/figure_audit.md`.
+- Save the rationale for choosing the final candidate in `reports/figure_selection.md`.
 - Only after the figure is accepted should it be inserted into `drafts/survey_en.md` and `drafts/survey_ja.md`, and then carried through to linked Markdown and TeX.
 - The manuscript must mention the figure in the main text and explain what it shows.
 
@@ -137,7 +145,14 @@ After both Markdown surveys and the figure are complete, run:
 ```bash
 python3 scripts/link_markdown_refs.py --run <run-dir>
 python3 scripts/render_tex_bib.py --run <run-dir>
+python3 scripts/compile_latex.py --run <run-dir>
 python3 scripts/validate_outputs.py --run <run-dir>
 ```
 
-The English and Japanese TeX files must be generated under `tex/` with a shared `references.bib`. If a figure is present, it must also be copied into `tex/figures/` and referenced from the TeX sources. The TeX files should compile on Overleaf with a standard bibliography workflow. For Japanese, prefer LuaLaTeX.
+The English and Japanese TeX files must be generated under `tex/` with a shared `references.bib`. If a figure is present, it must also be copied into `tex/figures/` and referenced from the TeX sources. The TeX files should compile on Overleaf with a standard bibliography workflow. If local LaTeX tools are available, run the local compile step and provide `tex/survey_en.pdf` and `tex/survey_ja.pdf`; for Japanese, explicitly use embedded-capable Japanese fonts such as HaranoAji, use LuaLaTeX first, and allow an upLaTeX+dvipdfmx local fallback when LuaLaTeX is unavailable or unusable. A Japanese PDF is acceptable only if Japanese text is visibly rendered, not merely if compilation exits successfully.
+
+## Git tracking policy
+
+Generated survey artifacts must not be tracked in Git. Keep workflow files, skills, prompts, scripts, templates, and docs under version control. Keep run outputs under `outputs/runs/`, and ignore the entire `outputs/` tree, including `outputs/.gitkeep`.
+
+Do not commit local zip packages, patch files, generated figures, TeX build artifacts, or survey run outputs unless the user explicitly asks for a release artifact to be versioned.

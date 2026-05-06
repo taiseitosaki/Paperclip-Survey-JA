@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overview figure JSON spec",
+  "type": "object",
+  "required": ["title", "panels"],
+  "properties": {
+    "title": {"type": "string"},
+    "subtitle": {"type": "string"},
+    "caption": {"type": "string"},
+    "width": {"type": "integer", "default": 2200},
+    "height": {"type": "integer", "default": 1300},
+    "render_scale": {"type": "integer", "default": 2},
+    "panels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "x", "y", "w", "h"],
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "subtitle": {"type": "string"},
+          "role": {
+            "type": "string",
+            "enum": ["dominant", "context", "substrate", "design", "evaluation", "risk", "default"]
+          },
+          "x": {"type": "number", "minimum": 0, "maximum": 1},
+          "y": {"type": "number", "minimum": 0, "maximum": 1},
+          "w": {"type": "number", "minimum": 0, "maximum": 1},
+          "h": {"type": "number", "minimum": 0, "maximum": 1},
+          "items": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {"type": "string"}
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "arrows": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "label": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -14,12 +14,14 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 CID_RE = re.compile(r"C\d{3,4}")
 REF_HEADING_RE = re.compile(r"^#{1,6}\s*(references|reference list|参考文献|文献)\s*$", re.I)
 IMAGE_RE = re.compile(r"^!\[(.*?)\]\(([^)]+)\)\s*$")
 FIG_CAPTION_RE = re.compile(r"^\*?(Figure\s+\d+\.?|図\s*\d+\.?)(.*)\*?$", re.I)
+OVERVIEW_MD_RE = re.compile(r"!\[[^\]]*\]\([^)]*overview_figure[^)]*\)", re.I)
+OVERVIEW_EXTS = [".png", ".jpg", ".jpeg", ".webp"]
 
 LATEX_SPECIALS = {
     "&": r"\&",
@@ -63,15 +65,19 @@ def normalize_authors(authors) -> str:
     if isinstance(authors, list):
         return " and ".join(str(a) for a in authors)
     s = str(authors).strip()
+    s = re.sub(r"\s+", " ", s)
+    et_al = re.match(r"^(?P<lead>.+?)\s+et\s+al\.?$", s, flags=re.I)
+    if et_al:
+        lead = et_al.group("lead").strip(" ,;")
+        return f"{lead} and others" if lead else "others"
     if ";" in s:
         return " and ".join(part.strip() for part in s.split(";") if part.strip())
-    if " and " in s:
-        return s
     if "," in s:
         parts = [part.strip() for part in s.split(",") if part.strip()]
         out: List[str] = []
         has_et_al = False
         for part in parts:
+            part = re.sub(r"^(and|&)\s+", "", part, flags=re.I).strip()
             if re.search(r"\bet\s+al\.?$", part, re.I):
                 has_et_al = True
                 part = re.sub(r"\bet\s+al\.?$", "", part, flags=re.I).strip()
@@ -79,8 +85,12 @@ def normalize_authors(authors) -> str:
                 out.append(part)
         if has_et_al:
             out.append("others")
-        if out:
+        # Convert natural-language comma lists such as
+        # "Huang, Altosaar, and Ranganath" into BibTeX-safe author lists.
+        if len(out) > 1 and all(len(part.split()) <= 4 for part in out):
             return " and ".join(out)
+    if " and " in s:
+        return s
     return s
 
 
@@ -152,6 +162,33 @@ def make_bib(cards: Dict[str, dict]) -> str:
         body = ",\n".join(f"  {k} = {{{bib_escape(v, url_field=(k == 'url'))}}}" for k, v in fields.items() if v)
         entries.append(f"@article{{{cid},\n{body}\n}}")
     return "\n\n".join(entries).rstrip() + "\n"
+
+
+def find_overview_figure(run_dir: Path) -> Optional[Path]:
+    fig_dir = run_dir / "figures"
+    for ext in OVERVIEW_EXTS:
+        path = fig_dir / f"overview_figure{ext}"
+        if path.exists():
+            return path
+    return None
+
+
+def choose_markdown_source(run_dir: Path, stem: str, overview_figure: Optional[Path]) -> Optional[Path]:
+    linked = run_dir / "drafts" / f"{stem}.linked.md"
+    raw = run_dir / "drafts" / f"{stem}.md"
+    existing = [p for p in [linked, raw] if p.exists()]
+    if not existing:
+        return None
+    if overview_figure is None:
+        return linked if linked.exists() else raw
+
+    with_figure = [p for p in existing if OVERVIEW_MD_RE.search(p.read_text(encoding="utf-8"))]
+    if with_figure:
+        return with_figure[0]
+    raise SystemExit(
+        f"Accepted overview figure exists at {overview_figure}, but neither {raw} nor {linked} "
+        "contains an overview_figure image block. Run scripts/insert_overview_figure.py first."
+    )
 
 
 def split_title_and_body(md: str) -> Tuple[str, List[str]]:
@@ -394,6 +431,7 @@ def tex_document(title: str, body: str, lang: str) -> str:
         preamble = r"""% Compile with LuaLaTeX on Overleaf.
 \documentclass[11pt,a4paper]{ltjsarticle}
 \usepackage{luatexja}
+\usepackage[haranoaji]{luatexja-preset}
 \usepackage{geometry}
 \geometry{margin=25mm}
 \usepackage{hyperref}
@@ -455,13 +493,12 @@ def main() -> None:
 
     cards = load_cards(run_dir)
     (tex_dir / "references.bib").write_text(make_bib(cards), encoding="utf-8")
+    overview_figure = find_overview_figure(run_dir)
 
     for stem, lang in [("survey_en", "en"), ("survey_ja", "ja")]:
-        linked = run_dir / "drafts" / f"{stem}.linked.md"
-        raw = run_dir / "drafts" / f"{stem}.md"
-        src = linked if linked.exists() else raw
-        if not src.exists():
-            print(f"skip: {src} does not exist")
+        src = choose_markdown_source(run_dir, stem, overview_figure)
+        if src is None:
+            print(f"skip: {run_dir / 'drafts' / f'{stem}.md'} does not exist")
             continue
         title, body = markdown_to_latex(src.read_text(encoding="utf-8"), src, tex_dir)
         dst = tex_dir / f"{stem}.tex"
